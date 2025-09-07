@@ -34,7 +34,8 @@ jobs:
 
       - name: Install Tailscale
         run: |
-          Invoke-WebRequest -Uri "https://tailscale.com/install.ps1" -UseBasicParsing | Invoke-Expression
+          Invoke-WebRequest -Uri "https://pkgs.tailscale.com/stable/tailscale-ipn-setup.exe" -OutFile "$env:TEMP\tailscale-installer.exe"
+          Start-Process "$env:TEMP\tailscale-installer.exe" -ArgumentList "/install /quiet" -Wait
 
       - name: Establish Tailscale Connection
         run: |
