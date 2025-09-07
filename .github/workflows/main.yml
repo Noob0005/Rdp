@@ -1,62 +1,74 @@
-name: Android
+name: RDP
 on:
   workflow_dispatch:
 
 jobs:
-  android-emulator:
-    runs-on: ubuntu-latest
+  secure-rdp:
+    runs-on: windows-latest
     timeout-minutes: 360
 
     steps:
-      - name: Install Dependencies
+      - name: Configure Core RDP Settings
         run: |
-          sudo apt-get update
-          sudo apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils cpu-checker
-          sudo apt-get install -y openjdk-17-jdk
-          sudo apt-get install -y xfce4 xfce4-goodies
-          sudo apt-get install -y tightvncserver
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 0
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "SecurityLayer" -Value 1
+
+          netsh advfirewall firewall delete rule name="Allow RDP"
+          netsh advfirewall firewall add rule name="Allow RDP" dir=in action=allow protocol=TCP localport=3389
+
+          $testResult = Test-NetConnection -ComputerName "localhost" -Port 3389
+          if (-not $testResult.TcpTestSucceeded) {
+            Write-Error "TCP connection test to port 3389 failed."
+            exit 1
+          }
+          Write-Host "TCP connectivity successful!"
+
+      - name: Create RDP User with Secure Password
+        run: |
+          $Password = "RDP-$(Get-Random -Minimum 10000 -Maximum 99999)"
+          New-LocalUser "Skyro" -Password ($Password | ConvertTo-SecureString -AsPlainText -Force) -FullName "Skyro" -Description "RDP User"
+          Add-LocalGroupMember -Group "Remote Desktop Users" -Member "Skyro"
+          Add-LocalGroupMember -Group "Administrators" -Member "Skyro"
+          echo "RDP_PASSWORD=$Password" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Install Tailscale
         run: |
-          curl -fsSL https://tailscale.com/install.sh | sh
-
-      - name: Install Android SDK
-        run: |
-          wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline-tools.zip
-          mkdir -p $HOME/android/sdk
-          unzip cmdline-tools.zip -d $HOME/android/temp
-          mv $HOME/android/temp/cmdline-tools $HOME/android/sdk/
-          rm -rf $HOME/android/temp cmdline-tools.zip
-          echo "export ANDROID_SDK_ROOT=$HOME/android/sdk" >> $HOME/.bashrc
-          echo "export PATH=$PATH:$ANDROID_SDK_ROOT/tools:$ANDROID_SDK_ROOT/platform-tools" >> $HOME/.bashrc
-          source $HOME/.bashrc
-          
-      - name: Download Android System Image and Tools
-        run: |
-          export PATH=$PATH:$HOME/android/sdk/cmdline-tools/bin
-          yes | sdkmanager --licenses
-          sdkmanager "platform-tools" "emulator" "system-images;android-33;google_apis;x86_64"
-
-      - name: Create Android Emulator (AVD)
-        run: |
-          export PATH=$PATH:$HOME/android/sdk/cmdline-tools/bin
-          echo "no" | avdmanager create avd -n android_vm -k "system-images;android-33;google_apis;x86_64" -d "pixel_6"
-          
-      - name: Start VNC Server
-        run: |
-          echo "password" | vncpasswd -f > $HOME/.vnc/passwd
-          chmod 600 $HOME/.vnc/passwd
-          vncserver :1 -geometry 1280x720 -depth 24
-          
-      - name: Start Emulator and Stream to VNC
-        run: |
-          export DISPLAY=:1
-          export PATH=$PATH:$HOME/android/sdk/emulator
-          nohup emulator -avd android_vm -no-snapshot -no-window -no-audio -camera-back none -camera-front none > emulator.log 2>&1 &
+          # Download the latest stable installer and run it silently
+          Invoke-WebRequest -Uri "https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe" -OutFile "$env:TEMP\tailscale-installer.exe"
+          Start-Process "$env:TEMP\tailscale-installer.exe" -ArgumentList "/install /quiet" -Wait
 
       - name: Establish Tailscale Connection
         run: |
-          sudo tailscale up --authkey ${{ secrets.TAILSCALE_AUTH_KEY }} --hostname "github-android"
-          echo "Tailscale IP: $(tailscale ip -4)"
-          echo "VNC Password is: password"
-          sleep infinity # Keep the runner alive
+          & "C:\Program Files\Tailscale\tailscale.exe" up --authkey ${{ secrets.TAILSCALE_AUTH_KEY }} --hostname "github-runner" --accept-routes
+
+      - name: Verify RDP Accessibility
+        run: |
+          # Add a delay to ensure the Tailscale network adapter initializes and gets an IP
+          Start-Sleep -s 5
+          $tsIP = & "C:\Program Files\Tailscale\tailscale.exe" ip -4
+          if (-not $tsIP) {
+            Write-Error "Failed to retrieve Tailscale IP."
+            exit 1
+          }
+          Write-Host "Tailscale IP: $tsIP"
+          echo "TAILSCALE_IP=$tsIP" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+          $testResult = Test-NetConnection -ComputerName $tsIP -Port 3389
+          if (-not $testResult.TcpTestSucceeded) {
+            Write-Error "TCP connection test to Tailscale IP on port 3389 failed."
+            exit 1
+          }
+          Write-Host "TCP connectivity successful!"
+
+      - name: Maintain Connection
+        run: |
+          Write-Host "===" RDP ACCESS "==="
+          Write-Host "Address: $env:TAILSCALE_IP"
+          Write-Host "Username: Skyro"
+          Write-Host "Password: $env:RDP_PASSWORD"
+
+          while ($true) {
+            Write-Host "[$(Get-Date)] RDP Active - Box Ctrl+C to terminate"
+            Start-Sleep -Seconds 300
+          }
