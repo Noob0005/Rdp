@@ -1,0 +1,80 @@
+name: RDP
+on:
+  workflow_dispatch:
+
+jobs:
+  secure-rdp:
+    runs-on: windows-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Configure Core RDP Settings
+        run: |
+          # Enable Remote Desktop and disable Network Level Authentication (if needed)
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 0
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "SecurityLayer" -Value 1
+
+          # Remove any existing firewall rule with the same name
+          netsh advfirewall firewall delete rule name="Allow RDP"
+
+          # Add firewall rule for RDP
+          netsh advfirewall firewall add rule name="Allow RDP" dir=in action=allow protocol=TCP localport=3389
+
+          # Test connectivity using Test-NetConnection
+          $testResult = Test-NetConnection -ComputerName "localhost" -Port 3389
+          if (-not $testResult.TcpTestSucceeded) {
+            Write-Error "TCP connection test to port 3389 failed."
+            exit 1
+          }
+          Write-Host "TCP connectivity successful!"
+
+      - name: Create RDP User with Secure Password
+        run: |
+          $Password = "RDP-$(Get-Random -Minimum 10000 -Maximum 99999)"
+          New-LocalUser "Skyro" -Password ($Password | ConvertTo-SecureString -AsPlainText -Force) -FullName "Skyro" -Description "RDP User"
+          Add-LocalGroupMember -Group "Remote Desktop Users" -Member "Skyro"
+          Add-LocalGroupMember -Group "Administrators" -Member "Skyro"
+          
+          # Store password for later use
+          echo "RDP_PASSWORD=$Password" | Out-File -FilePath env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Install Tailscale
+        run: |
+          Invoke-WebRequest -Uri "https://tailscale.com/install.ps1" -UseBasicParsing | Invoke-Expression
+
+      - name: Establish Tailscale Connection
+        run: |
+          & "C:\Program Files\Tailscale\tailscale.exe" up --authkey ${{ secrets.TAILSCALE_AUTH_KEY }} --hostname "github-runner" --accept-routes
+
+      - name: Verify RDP Accessibility
+        run: |
+          # Retrieve Tailscale IP
+          $tsIP = & "C:\Program Files\Tailscale\tailscale.exe" ip -4
+          if (-not $tsIP) {
+            Write-Error "Failed to retrieve Tailscale IP."
+            exit 1
+          }
+          Write-Host "Tailscale IP: $tsIP"
+          echo "TAILSCALE_IP=$tsIP" | Out-File -FilePath env:GITHUB_ENV -Encoding utf8 -Append
+          
+          # Test connectivity to the Tailscale IP
+          $testResult = Test-NetConnection -ComputerName $tsIP -Port 3389
+          if (-not $testResult.TcpTestSucceeded) {
+            Write-Error "TCP connection test to Tailscale IP on port 3389 failed."
+            exit 1
+          }
+          Write-Host "TCP connectivity successful!"
+
+      - name: Maintain Connection
+        run: |
+          Write-Host "===" RDP ACCESS "==="
+          Write-Host "Address: $env:TAILSCALE_IP"
+          Write-Host "Username: Skyro"
+          Write-Host "Password: $env:RDP_PASSWORD"
+          
+          # Keep runner active indefinitely
+          while ($true) {
+            Write-Host "[$(Get-Date)] RDP Active - Box Ctrl+C to terminate"
+            Start-Sleep -Seconds 300
+          }
