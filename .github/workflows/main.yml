@@ -20,26 +20,26 @@ jobs:
         run: |
           curl -fsSL https://tailscale.com/install.sh | sh
 
-      - name: Install Android SDK
+      - name: Install Android SDK (Corrected)
         run: |
+          # Download and set up the SDK in the new required structure
           wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline-tools.zip
-          mkdir -p $HOME/android/sdk
+          mkdir -p $HOME/android/sdk/cmdline-tools
           unzip cmdline-tools.zip -d $HOME/android/temp
-          mv $HOME/android/temp/cmdline-tools $HOME/android/sdk/
+          mv $HOME/android/temp/cmdline-tools $HOME/android/sdk/cmdline-tools/latest
           rm -rf $HOME/android/temp cmdline-tools.zip
-          echo "export ANDROID_SDK_ROOT=$HOME/android/sdk" >> $HOME/.bashrc
-          echo "export PATH=$PATH:$ANDROID_SDK_ROOT/tools:$ANDROID_SDK_ROOT/platform-tools" >> $HOME/.bashrc
-          source $HOME/.bashrc
           
-      - name: Download Android System Image and Tools
+      - name: Download Android System Image and Tools (Corrected Path)
         run: |
-          export PATH=$PATH:$HOME/android/sdk/cmdline-tools/bin
+          # Add the new 'latest' directory to the PATH
+          export PATH=$PATH:$HOME/android/sdk/cmdline-tools/latest/bin
           yes | sdkmanager --licenses
           sdkmanager "platform-tools" "emulator" "system-images;android-33;google_apis;x86_64"
 
-      - name: Create Android Emulator (AVD)
+      - name: Create Android Emulator (AVD) (Corrected Path)
         run: |
-          export PATH=$PATH:$HOME/android/sdk/cmdline-tools/bin
+          # Add the new 'latest' directory to the PATH
+          export PATH=$PATH:$HOME/android/sdk/cmdline-tools/latest/bin
           echo "no" | avdmanager create avd -n android_vm -k "system-images;android-33;google_apis;x86_64" -d "pixel_6"
           
       - name: Start VNC Server
@@ -57,6 +57,11 @@ jobs:
       - name: Establish Tailscale Connection
         run: |
           sudo tailscale up --authkey ${{ secrets.TAILSCALE_AUTH_KEY }} --hostname "github-android"
+          echo "Waiting for Tailscale IP..."
+          sleep 5 # Give Tailscale a moment to connect
+          echo "---"
           echo "Tailscale IP: $(tailscale ip -4)"
+          echo "VNC Address: $(tailscale ip -4):1"
           echo "VNC Password is: password"
+          echo "---"
           sleep infinity # Keep the runner alive
