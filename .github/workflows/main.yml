@@ -34,8 +34,9 @@ jobs:
 
       - name: Install Tailscale
         run: |
-          # This is the corrected, stable method
-          Invoke-WebRequest -Uri "https://tailscale.com/install.ps1" -UseBasicParsing | Invoke-Expression
+          # Download the latest stable installer and run it silently
+          Invoke-WebRequest -Uri "https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe" -OutFile "$env:TEMP\tailscale-installer.exe"
+          Start-Process "$env:TEMP\tailscale-installer.exe" -ArgumentList "/install /quiet" -Wait
 
       - name: Establish Tailscale Connection
         run: |
@@ -43,7 +44,7 @@ jobs:
 
       - name: Verify RDP Accessibility
         run: |
-          # Adding a small delay to ensure Tailscale IP is assigned
+          # Add a delay to ensure the Tailscale network adapter initializes and gets an IP
           Start-Sleep -s 5
           $tsIP = & "C:\Program Files\Tailscale\tailscale.exe" ip -4
           if (-not $tsIP) {
