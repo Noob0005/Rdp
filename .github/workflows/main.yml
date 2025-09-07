@@ -20,30 +20,29 @@ jobs:
         run: |
           curl -fsSL https://tailscale.com/install.sh | sh
 
-      - name: Install Android SDK (Corrected)
+      - name: Install Android SDK
         run: |
-          # Download and set up the SDK in the new required structure
           wget https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline-tools.zip
           mkdir -p $HOME/android/sdk/cmdline-tools
           unzip cmdline-tools.zip -d $HOME/android/temp
           mv $HOME/android/temp/cmdline-tools $HOME/android/sdk/cmdline-tools/latest
           rm -rf $HOME/android/temp cmdline-tools.zip
           
-      - name: Download Android System Image and Tools (Corrected Path)
+      - name: Download Android System Image and Tools
         run: |
-          # Add the new 'latest' directory to the PATH
           export PATH=$PATH:$HOME/android/sdk/cmdline-tools/latest/bin
           yes | sdkmanager --licenses
           sdkmanager "platform-tools" "emulator" "system-images;android-33;google_apis;x86_64"
 
-      - name: Create Android Emulator (AVD) (Corrected Path)
+      - name: Create Android Emulator (AVD)
         run: |
-          # Add the new 'latest' directory to the PATH
           export PATH=$PATH:$HOME/android/sdk/cmdline-tools/latest/bin
           echo "no" | avdmanager create avd -n android_vm -k "system-images;android-33;google_apis;x86_64" -d "pixel_6"
           
-      - name: Start VNC Server
+      - name: Start VNC Server (Corrected)
         run: |
+          # Create the .vnc directory before trying to write to it
+          mkdir -p $HOME/.vnc
           echo "password" | vncpasswd -f > $HOME/.vnc/passwd
           chmod 600 $HOME/.vnc/passwd
           vncserver :1 -geometry 1280x720 -depth 24
@@ -58,10 +57,10 @@ jobs:
         run: |
           sudo tailscale up --authkey ${{ secrets.TAILSCALE_AUTH_KEY }} --hostname "github-android"
           echo "Waiting for Tailscale IP..."
-          sleep 5 # Give Tailscale a moment to connect
+          sleep 5 
           echo "---"
           echo "Tailscale IP: $(tailscale ip -4)"
           echo "VNC Address: $(tailscale ip -4):1"
           echo "VNC Password is: password"
           echo "---"
-          sleep infinity # Keep the runner alive
+          sleep infinity 
