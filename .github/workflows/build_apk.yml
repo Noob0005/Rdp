@@ -11,10 +11,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: ./expense_flutter
-
     steps:
       - uses: actions/checkout@v4
 
@@ -31,10 +27,31 @@ jobs:
           flutter-version: '3.19.0'
           cache: true
 
+      - name: Reconstruct Android Project
+        run: |
+          echo "Moving source code to temp..."
+          mv expense_flutter source_temp
+          
+          echo "Generating platform files..."
+          flutter create --project-name expense_flutter --org com.settler expense_flutter
+          
+          echo "Restoring logic..."
+          rm -rf expense_flutter/lib
+          cp -r source_temp/lib expense_flutter/
+          cp source_temp/pubspec.yaml expense_flutter/
+          
+          # Ensure dependencies in pubspec match the generated project structure if needed
+          # (Our pubspec is standard, so copying it back is safe)
+          
+          echo "Cleanup..."
+          rm -rf source_temp
+
       - name: Get Dependencies
+        working-directory: ./expense_flutter
         run: flutter pub get
 
       - name: Build APK
+        working-directory: ./expense_flutter
         run: flutter build apk --release --no-tree-shake-icons
 
       - name: Upload APK
