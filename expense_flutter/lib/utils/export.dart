@@ -2,7 +2,7 @@
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:excel/excel.dart';
+import 'package:excel/excel.dart' as excel_pkg;
 import 'package:pdf/widgets.dart' as pw;
 import 'package:pdf/pdf.dart';
 import '../models/expense_model.dart';
@@ -20,29 +20,29 @@ Future<void> exportCSV(List<Expense> expenses) async {
 }
 
 Future<void> exportExcel(List<Expense> expenses, AppSummary summary) async {
-  var excel = Excel.createExcel();
+  var excel = excel_pkg.Excel.createExcel();
   
   // Sheet 1: Expenses
-  Sheet sheet1 = excel['Expenses'];
-  sheet1.appendRow(['Date', 'Person', 'Category', 'Amount', 'Remarks'].map((e) => TextCellValue(e)).toList());
+  excel_pkg.Sheet sheet1 = excel['Expenses'];
+  sheet1.appendRow(['Date', 'Person', 'Category', 'Amount', 'Remarks'].map((e) => excel_pkg.TextCellValue(e)).toList());
   for (var e in expenses) {
     sheet1.appendRow([
-        TextCellValue(e.date), 
-        TextCellValue(e.person), 
-        TextCellValue(e.category.name), 
-        DoubleCellValue(e.amount), 
-        TextCellValue(e.remarks)
+        excel_pkg.TextCellValue(e.date), 
+        excel_pkg.TextCellValue(e.person), 
+        excel_pkg.TextCellValue(e.category.name), 
+        excel_pkg.DoubleCellValue(e.amount), 
+        excel_pkg.TextCellValue(e.remarks)
     ]);
   }
 
   // Sheet 2: Summary
-  Sheet sheet2 = excel['Summary'];
-  sheet2.appendRow([TextCellValue('Total'), DoubleCellValue(summary.totalExpense)]);
-  sheet2.appendRow([TextCellValue('Avg Per Person'), DoubleCellValue(summary.averagePerPerson)]);
+  excel_pkg.Sheet sheet2 = excel['Summary'];
+  sheet2.appendRow([excel_pkg.TextCellValue('Total'), excel_pkg.DoubleCellValue(summary.totalExpense)]);
+  sheet2.appendRow([excel_pkg.TextCellValue('Avg Per Person'), excel_pkg.DoubleCellValue(summary.averagePerPerson)]);
   sheet2.appendRow([]);
-  sheet2.appendRow([TextCellValue('Settlements')]);
+  sheet2.appendRow([excel_pkg.TextCellValue('Settlements')]);
   for (var s in summary.settlements) {
-    sheet2.appendRow([TextCellValue(s.from), TextCellValue('pays'), TextCellValue(s.to), DoubleCellValue(s.amount)]);
+    sheet2.appendRow([excel_pkg.TextCellValue(s.from), excel_pkg.TextCellValue('pays'), excel_pkg.TextCellValue(s.to), excel_pkg.DoubleCellValue(s.amount)]);
   }
 
   final dir = await getApplicationDocumentsDirectory();

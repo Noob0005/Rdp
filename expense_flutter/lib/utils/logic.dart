@@ -1,4 +1,5 @@
 
+
 import '../models/expense_model.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -47,7 +48,7 @@ AppSummary calculateSummary(List<Expense> expenses) {
     final amount = dBalances[dIdx] < cBalances[cIdx] ? dBalances[dIdx] : cBalances[cIdx];
     
     if (amount > 0.01) {
-      settlements.push(Settlement(
+      settlements.add(Settlement(
         from: debtors[dIdx].name,
         to: creditors[cIdx].name,
         amount: double.parse(amount.toStringAsFixed(2)),
@@ -67,10 +68,6 @@ AppSummary calculateSummary(List<Expense> expenses) {
     personBalances: personBalances,
     settlements: settlements,
   );
-}
-
-extension on List<Settlement> {
-  void push(Settlement s) => add(s);
 }
 
 // --- Telegram Logger ---
