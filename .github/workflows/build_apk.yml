@@ -43,11 +43,24 @@ jobs:
           cp -r source_temp/lib expense_flutter/
           cp source_temp/pubspec.yaml expense_flutter/
           
-          # Ensure dependencies in pubspec match the generated project structure if needed
-          # (Our pubspec is standard, so copying it back is safe)
-          
           echo "Cleanup..."
           rm -rf source_temp
+
+      - name: Patch Android SDK Versions
+        working-directory: ./expense_flutter/android/app
+        run: |
+          echo "Patching build.gradle to support modern plugins..."
+          # Force minSdkVersion to 23 (required by many file/permission plugins)
+          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/g' build.gradle
+          sed -i 's/minSdkVersion [0-9]*/minSdkVersion 23/g' build.gradle
+          
+          # Force compileSdkVersion to 34 (Android 14)
+          sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 34/g' build.gradle
+          sed -i 's/compileSdkVersion [0-9]*/compileSdkVersion 34/g' build.gradle
+          
+          # Force targetSdkVersion to 34
+          sed -i 's/targetSdkVersion flutter.targetSdkVersion/targetSdkVersion 34/g' build.gradle
+          sed -i 's/targetSdkVersion [0-9]*/targetSdkVersion 34/g' build.gradle
 
       - name: Get Dependencies
         working-directory: ./expense_flutter
@@ -55,7 +68,7 @@ jobs:
 
       - name: Build APK
         working-directory: ./expense_flutter
-        run: flutter build apk --release --no-tree-shake-icons
+        run: flutter build apk --release --no-tree-shake-icons --verbose
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
