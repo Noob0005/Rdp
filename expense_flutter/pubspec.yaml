@@ -1,0 +1,30 @@
+name: expense_flutter
+description: A new Flutter project.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  shared_preferences: ^2.2.2
+  intl: ^0.19.0
+  uuid: ^4.2.1
+  http: ^1.1.0
+  path_provider: ^2.1.1
+  share_plus: ^7.2.1
+  file_picker: ^6.1.1
+  excel: ^4.0.0
+  pdf: ^3.10.4
+  permission_handler: ^11.0.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+
+flutter:
+  uses-material-design: true
