@@ -51,20 +51,60 @@ jobs:
         run: |
           echo "Patching build.gradle to support modern plugins..."
           # Force minSdkVersion to 23 (required by many file/permission plugins)
-          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/g' build.gradle
-          sed -i 's/minSdkVersion [0-9]*/minSdkVersion 23/g' build.gradle
+          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 23/g' build.gradle || true
+          sed -i 's/minSdkVersion [0-9]*/minSdkVersion 23/g' build.gradle || true
           
           # Force compileSdkVersion to 34 (Android 14)
-          sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 34/g' build.gradle
-          sed -i 's/compileSdkVersion [0-9]*/compileSdkVersion 34/g' build.gradle
+          sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 34/g' build.gradle || true
+          sed -i 's/compileSdkVersion [0-9]*/compileSdkVersion 34/g' build.gradle || true
           
           # Force targetSdkVersion to 34
-          sed -i 's/targetSdkVersion flutter.targetSdkVersion/targetSdkVersion 34/g' build.gradle
-          sed -i 's/targetSdkVersion [0-9]*/targetSdkVersion 34/g' build.gradle
+          sed -i 's/targetSdkVersion flutter.targetSdkVersion/targetSdkVersion 34/g' build.gradle || true
+          sed -i 's/targetSdkVersion [0-9]*/targetSdkVersion 34/g' build.gradle || true
+
+          # Ensure AndroidX and Jetifier flags exist in project gradle.properties
+          if [ ! -f ../gradle.properties ]; then
+            echo "android.useAndroidX=true" > ../gradle.properties
+            echo "android.enableJetifier=true" >> ../gradle.properties
+          else
+            if ! grep -q '^android.useAndroidX' ../gradle.properties 2>/dev/null; then echo 'android.useAndroidX=true' >> ../gradle.properties; fi
+            if ! grep -q '^android.enableJetifier' ../gradle.properties 2>/dev/null; then echo 'android.enableJetifier=true' >> ../gradle.properties; fi
+          fi
+
+          # Append a conservative resolutionStrategy to the project build.gradle to force consistent deps (if not already present)
+          if ! grep -q 'resolutionStrategy' ../build.gradle 2>/dev/null; then
+            cat >> ../build.gradle <<'GRADLE'
+
+subprojects {
+  configurations.all {
+    resolutionStrategy {
+      // Force consistent dependency versions to avoid duplicate classes
+      force 'com.google.guava:guava:31.1-android'
+      // Add other forced versions here if diagnostics indicate more conflicts
+    }
+  }
+}
+
+GRADLE
+          fi
 
       - name: Get Dependencies
         working-directory: ./expense_flutter
         run: flutter pub get
+
+      - name: Dump Android Dependencies
+        working-directory: ./expense_flutter/android
+        run: |
+          echo "Dumping Gradle dependency reports..."
+          ./gradlew :app:dependencies --configuration releaseRuntimeClasspath > release_runtime_deps.txt || true
+          ./gradlew :app:dependencies --configuration releaseCompileClasspath > release_compile_deps.txt || true
+          tar -czf deps_${GITHUB_RUN_ID}.tar.gz release_runtime_deps.txt release_compile_deps.txt
+
+      - name: Upload Android deps
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-deps
+          path: expense_flutter/android/deps_${GITHUB_RUN_ID}.tar.gz
 
       - name: Build APK
         working-directory: ./expense_flutter
